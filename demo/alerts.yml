@@ -1,0 +1,12 @@
+groups:
+  - name: demo
+    rules:
+      - alert: CheckoutErrorRate
+        expr: sum(rate(demo_checkout_requests_total{status="500"}[1m])) / sum(rate(demo_checkout_requests_total[1m])) > 0.05
+        for: 15s
+        labels:
+          severity: critical
+          service: checkout
+          environment: staging
+        annotations:
+          summary: "Checkout error rate above 5% over 1m"

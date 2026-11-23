@@ -1,0 +1,1 @@
+{"max_intake_p95_ms": 300.0, "max_relay_p95_ms": 500.0, "max_scenario_seconds": 120.0, "min_repair_rate": 1.0, "note": "Frozen M5 repair baseline on the demo host. AC-6 intake/outbox numbers measured here; NFR-1/NFR-5/NFR-6 enforced by the suite.", "scenarios": ["config-regression", "code-bug"]}

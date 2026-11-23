@@ -1,0 +1,7 @@
+# Demo sink: Alertmanager delivers here until intake wiring lands (M4).
+route:
+  receiver: demo-sink
+receivers:
+  - name: demo-sink
+    webhook_configs:
+      - url: http://demo:8000/alerts

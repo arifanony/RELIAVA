@@ -1,0 +1,39 @@
+[project]
+name = "ai-sre"
+version = "0.1.0"
+description = "AI SRE — monitoring alert to verified recovery"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "pydantic>=2.0",
+  "uvicorn>=0.30",
+  "psycopg[binary,pool]>=3.1",
+  "httpx>=0.27",
+  "drain3==0.9.11",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8", "mypy>=1.10"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_sre"]
+
+[tool.ruff]
+line-length = 100
+cache-dir = "/tmp/ai-sre-ruff-cache"
+
+[tool.mypy]
+python_version = "3.12"
+cache_dir = "/tmp/ai-sre-mypy-cache"
+
+[[tool.mypy.overrides]]
+module = "drain3.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+cache_dir = "/tmp/ai-sre-pytest-cache"
+pythonpath = ["demo"]

@@ -1,0 +1,25 @@
+# One-host AI SRE platform (SPEC constraint). Demo + monitoring stay disposable
+# under demo/docker-compose.yml; the unified store and API live here.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aisre
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
