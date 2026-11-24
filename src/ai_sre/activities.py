@@ -15,7 +15,7 @@ from psycopg_pool import AsyncConnectionPool
 from temporalio import activity
 
 from ai_sre.db import get_pool
-from ai_sre.diagnosis import BudgetLedger, OllamaTransport, run_diagnosis
+from ai_sre.diagnosis import BudgetLedger, run_diagnosis, transport_from_env
 from ai_sre.dispatch import dispatch_action
 from ai_sre.evidence import collect
 from ai_sre.patches import propose_patches
@@ -58,7 +58,8 @@ async def collect_evidence(incident_id: str) -> str:
 
 @activity.defn
 async def diagnose(evidence_json: str) -> str:
-    """Run the tiered cited diagnosis (models from env, Ollama dev default)."""
+    """Run the tiered cited diagnosis (models from env; Gemini API default
+    for diagnosis, local Llama critic default — see .env.example)."""
     from ai_sre.evidence import EvidenceItem
 
     raw = json.loads(evidence_json)
@@ -66,14 +67,8 @@ async def diagnose(evidence_json: str) -> str:
         EvidenceItem(id=e["id"], source=e["source"], window=e["window"], text=e["text"])
         for e in raw
     ]
-    diagnosis_transport = OllamaTransport(
-        model=os.environ.get("DIAGNOSIS_MODEL", "qwen2.5-coder:7b"),
-        family=os.environ.get("DIAGNOSIS_FAMILY", "qwen"),
-    )
-    critic_transport = OllamaTransport(
-        model=os.environ.get("CRITIC_MODEL", "llama3.2:1b"),
-        family=os.environ.get("CRITIC_FAMILY", "llama"),
-    )
+    diagnosis_transport = transport_from_env("DIAGNOSIS", "gemini:gemini-2.5-flash")
+    critic_transport = transport_from_env("CRITIC", "ollama:llama3.2:1b")
     result = await run_diagnosis(items, diagnosis_transport, critic_transport, BudgetLedger())
     return json.dumps(
         {

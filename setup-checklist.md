@@ -27,10 +27,11 @@ No product code and no `genesis init` until every box below is checked.
 - [ ] Pull dev model per PDF: `ollama pull qwen2.5-coder:7b`
 - [ ] Verify: `ollama --version && ollama list`
 
-## 5. OpenRouter (key held by user — never paste it in chat or files)
-- [ ] Export per shell: `export OPENROUTER_API_KEY="$OPENROUTER_API_KEY"`
-- [ ] Models for M1 research: Gemini 2.5 Flash / DeepSeek-V3 (triage), Qwen-2.5-Coder-32B (diagnosis/patch), Claude 3.5 Haiku (critic).
-- [ ] Verify without printing the key: `test -n "$OPENROUTER_API_KEY" && echo ok`.
+## 5. Model APIs (keys held by user — never paste in chat or files)
+- [ ] Gemini (diagnosis default): export per shell: `export GEMINI_API_KEY=<your key>` (`GOOGLE_API_KEY` also accepted).
+- [ ] OpenRouter (critic/triage options): export per shell: `export OPENROUTER_API_KEY=<your key>`.
+- [ ] Routing is by env spec (`provider:model`) per SPEC NFR-4 — see `.env.example` for the defaults and the recommended API critic.
+- [ ] Verify without printing the keys: `test -n "$GEMINI_API_KEY" && echo ok`.
 
 ## 6. Genesis readiness
 - [ ] `node --version` passes (v22 already on this Mac; needs 18+).

@@ -39,7 +39,7 @@ Engineers receive monitoring alerts but investigation and remediation are slow, 
 - NFR-1: Intake p95 at most 300 ms; outbox row to workflow start p95 at most 500 ms; alert to workflow start p95 at most 2 s; intake availability 99.5% monthly.
 - NFR-2: Investigation deadline 8 min from alert to diagnosis or escalation; incident may stay open up to 24 h awaiting human approval.
 - NFR-3: Per-incident model budget at most USD 0.08 and 80,000 tokens, worst-case reserved before each call; 10 concurrent investigations; 2 model calls per incident; 16 global.
-- NFR-4: Tiered inference routing — Gemini 2.5 Flash / DeepSeek-V3 for triage, Qwen-2.5-Coder-32B for diagnosis and patch, Claude 3.5 Haiku as cross-family critic, local Ollama for dev and CI; deterministic evidence collection continues and escalates with a pre-processed bundle when providers are down.
+- NFR-4: Tiered inference routing — Gemini 2.5 Flash over API as the default diagnosis and patch model; the critic is always a different model family (an OpenRouter model, or local Llama when no key is configured); free-tier OpenRouter models may serve triage; local Ollama remains for dev and CI and as the offline fallback. Each role is selected by an env spec (`provider:model` — gemini, openrouter or ollama; a bare model name means ollama) resolved in one place (`transport_from_env`), and deterministic evidence collection continues and escalates with a pre-processed bundle when providers are down.
 - NFR-5: Monthly infrastructure ceiling USD 150 (alert at 80%, stop non-essential work at 100%); platform recovery RPO 15 min, RTO 2 h from single-database backup.
 - NFR-6: Safety invariants hold throughout: model proposes only with read-only tools (I1); only the trusted dispatcher writes approved digests (I2); approvals bind digest, target, revision, policy, approver, expiry (I3); verification is independent telemetry (I4); unknown outcomes reconcile first (I5); application content is untrusted input, never instructions (I6).
 
@@ -48,7 +48,7 @@ Engineers receive monitoring alerts but investigation and remediation are slow, 
 - One host, Docker Compose; one container image with four entry points: api with embedded relay, agent-worker with zero write credentials, sandbox-runner with no credentials, trusted-worker holding sole staging write credentials.
 - Unified PostgreSQL 16 store for state, outbox, native FTS BM25 runbooks, and bounded compressed bytea artifacts (at most 1 MiB); Temporal for durable execution; OpenTelemetry plus Prometheus plus Grafana for platform health.
 - Target applications are Python web services on Linux containers; the platform writes only to a disposable staging copy, never real production.
-- Mac toolchain per setup checklist: Colima, uv with Python 3.12, Ollama; OpenRouter key in environment only, never in chat or files.
+- Mac toolchain per setup checklist: Colima, uv with Python 3.12, Ollama; API keys (Gemini, OpenRouter) in environment only, never in chat or files.
 
 ## Non-goals
 

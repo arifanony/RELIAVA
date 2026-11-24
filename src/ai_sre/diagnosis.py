@@ -10,6 +10,7 @@ local Ollama tiers cost 0.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -26,8 +27,11 @@ MAX_INCIDENT_COST_USD = 0.08
 
 COST_PER_1K_USD = {  # rough estimates for ledger math, not billing
     "gemini-2.5-flash": 0.0003,
+    "deepseek-flash": 0.0006,
     "deepseek-v3": 0.0003,
+    "qwen3.8-flash": 0.0005,
     "qwen-2.5-coder-32b": 0.0004,
+    "claude-haiku-5-5": 0.0005,
     "claude-3.5-haiku": 0.001,
     "ollama": 0.0,
 }
@@ -83,6 +87,88 @@ class OpenRouterTransport:
             "input_tokens": estimate_tokens(prompt),
             "output_tokens": estimate_tokens(text),
         }
+
+
+@dataclass
+class GeminiTransport:
+    api_key: str
+    model: str = "gemini-2.5-flash"
+    family: str = "google"
+    site: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+    async def generate(self, prompt: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=MODEL_CALL_TIMEOUT) as client:
+            response = await client.post(
+                f"{self.site}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": self.model, "messages": [{"role": "user", "content": prompt}]},
+            )
+            response.raise_for_status()
+            text = str(response.json()["choices"][0]["message"]["content"])
+        return {
+            "text": text,
+            "input_tokens": estimate_tokens(prompt),
+            "output_tokens": estimate_tokens(text),
+        }
+
+
+def _family_for(model: str) -> str:
+    """Derive the model family from a model name or OpenRouter slug."""
+    slug = model.lower()
+    if "gemini" in slug or "gemma" in slug:
+        return "google"
+    if "claude" in slug:
+        return "anthropic"
+    for hint in ("llama", "qwen", "deepseek", "mistral"):
+        if hint in slug:
+            return hint
+    return slug.split("/")[0].split("-")[0].split(":")[0]
+
+
+def _required_key(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    raise ValueError(
+        f"no API key in environment (looked for {', '.join(names)}); "
+        "export it in the operator shell (AC-8), never in a repository file"
+    )
+
+
+def transport_from_env(role: str, default: str) -> Transport:
+    """Build the transport for a role (DIAGNOSIS, CRITIC, TRIAGE) from env.
+
+    ``<ROLE>_MODEL`` is a spec: ``gemini:<model>``, ``openrouter:<model>``
+    or ``ollama:<model>``; a bare model name means Ollama (the historical
+    behaviour). ``<ROLE>_FAMILY`` overrides the derived model family.
+    API keys come from the operator shell only (AC-8).
+    """
+    spec = os.environ.get(f"{role}_MODEL", default)
+    provider, model = "ollama", spec
+    for prefix in ("gemini:", "openrouter:", "ollama:"):
+        if spec.startswith(prefix):
+            provider, model = prefix[:-1], spec[len(prefix):]
+            break
+    else:
+        head, sep, _ = spec.partition(":")
+        if sep and head.isalpha():
+            raise ValueError(
+                f"unknown model provider {head!r} in {role}_MODEL "
+                "(use gemini:, openrouter: or ollama:)"
+            )
+    family = os.environ.get(f"{role}_FAMILY") or _family_for(model)
+    if provider == "gemini":
+        return GeminiTransport(
+            api_key=_required_key("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+            model=model,
+            family=family,
+        )
+    if provider == "openrouter":
+        return OpenRouterTransport(
+            api_key=_required_key("OPENROUTER_API_KEY"), model=model, family=family
+        )
+    return OllamaTransport(model=model, family=family)
 
 
 def cost_per_1k(model: str) -> float:
