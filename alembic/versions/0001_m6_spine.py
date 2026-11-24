@@ -12,6 +12,44 @@ revision = "0001"
 down_revision = None
 
 UP = """
+-- The chain must run from an empty database: first ensure the pre-M6 base
+-- tables this migration alters or references exist, in their M0 shapes
+-- (mirrors db.py / approvals.py / dispatch.py runtime DDL; IF NOT EXISTS
+-- makes this a no-op on databases the app already initialised).
+CREATE TABLE IF NOT EXISTS incidents (
+  id UUID PRIMARY KEY,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  service TEXT NOT NULL,
+  environment TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS approvals (
+  id SERIAL PRIMARY KEY,
+  action_digest TEXT NOT NULL,
+  target_env TEXT NOT NULL,
+  source_revision TEXT NOT NULL,
+  policy_version TEXT NOT NULL,
+  approver TEXT NOT NULL,
+  decision TEXT NOT NULL DEFAULT 'pending',
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  valid_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS dispatches (
+  id SERIAL PRIMARY KEY,
+  action_digest TEXT NOT NULL,
+  target_env TEXT NOT NULL,
+  source_revision TEXT NOT NULL,
+  approval_id INT NOT NULL REFERENCES approvals(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (action_digest, target_env, source_revision)
+);
 CREATE TABLE IF NOT EXISTS actions (
   id SERIAL PRIMARY KEY,
   incident_id UUID NOT NULL REFERENCES incidents(id),

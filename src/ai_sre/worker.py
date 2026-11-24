@@ -23,8 +23,8 @@ from ai_sre.activities import (
     test_patch,
     verify,
 )
-from ai_sre.db import database_url
-from ai_sre.relay import relay_listen
+from ai_sre.db import database_url, get_pool
+from ai_sre.relay import relay_listen, relay_sweep
 from ai_sre.workflows import (
     TASK_QUEUE_INVESTIGATION,
     TASK_QUEUE_SANDBOX,
@@ -61,6 +61,8 @@ async def run_workers() -> None:
 
 async def run_relay() -> None:
     client = await Client.connect(temporal_address())
+    pool = get_pool()
+    await pool.open()
 
     async def start_workflow(outbox_id: int, incident_id: str) -> None:
         await client.start_workflow(
@@ -71,7 +73,24 @@ async def run_relay() -> None:
             execution_timeout=WORKFLOW_EXECUTION_TIMEOUT,  # 8 min deadline
         )
 
-    await relay_listen(database_url(), start_workflow)
+    async def sweep() -> None:
+        await relay_sweep(pool, start_workflow)
+
+    try:
+        await relay_listen(database_url(), start_workflow, sweep=sweep)
+    finally:
+        await pool.close()
+
+
+async def run_embedded_relay() -> None:
+    """The api process's relay (FR-14): retry the Temporal connection so
+    intake keeps serving while Temporal is down; rows stay undispatched
+    until a start succeeds."""
+    while True:
+        try:
+            await run_relay()
+        except Exception:  # noqa: BLE001 - Temporal unreachable: wait, retry
+            await asyncio.sleep(2.0)
 
 
 def main(argv: list[str]) -> int:

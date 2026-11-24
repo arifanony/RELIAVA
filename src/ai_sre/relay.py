@@ -63,6 +63,67 @@ async def relay_forever(pool: AsyncConnectionPool, poll_interval: float = 2.0) -
         await asyncio.sleep(poll_interval)
 
 
+async def _mark_dispatched(
+    cur: Any, outbox_id: int, incident_id: str, trigger: str
+) -> None:
+    workflow_id = f"incident-{incident_id}"
+    await cur.execute(
+        """
+        UPDATE outbox
+        SET claimed_at = now(), dispatched_at = now(), workflow_id = %s
+        WHERE id = %s AND dispatched_at IS NULL
+        """,
+        (workflow_id, outbox_id),
+    )
+    if cur.rowcount != 1:  # already dispatched by the other relay path
+        return
+    await cur.execute(
+        """
+        INSERT INTO incident_events (incident_id, type, source, data)
+        VALUES (%s, 'ai-sre.incident.dispatch_requested', 'relay', %s)
+        """,
+        (incident_id, Json({"workflow_id": workflow_id, "trigger": trigger})),
+    )
+
+
+async def relay_sweep(
+    pool: AsyncConnectionPool,
+    on_outbox: Callable[[int, str], Awaitable[None]],
+) -> int:
+    """Claim pending rows (SKIP LOCKED) and hand each to on_outbox.
+
+    A row is marked dispatched only after the callback succeeds, so a
+    failed start (for example Temporal down) leaves the row for the next
+    sweep; a crash between start and mark is safe because the workflow id
+    incident-<id> is idempotent. Returns the number of rows handed over.
+    """
+    handed = 0
+    while True:
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    SELECT id, incident_id, type FROM outbox
+                    WHERE dispatched_at IS NULL
+                    ORDER BY id LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                    """
+                )
+                row = await cur.fetchone()
+                if row is None:
+                    await conn.commit()
+                    return handed
+                outbox_id, incident_id, typ = int(row[0]), str(row[1]), str(row[2])
+                try:
+                    await on_outbox(outbox_id, incident_id)
+                except Exception:  # noqa: BLE001 - leave the row for a later sweep
+                    await conn.rollback()
+                    return handed
+                await _mark_dispatched(cur, outbox_id, incident_id, typ)
+            await conn.commit()
+        handed += 1
+
+
 async def relay_listen(
     conninfo: str,
     on_outbox: Callable[[int, str], Awaitable[None]],
@@ -101,6 +162,8 @@ async def relay_listen(
                     if on_error is not None:
                         await on_error(outbox_id, exc)
                     continue
+                async with query_conn.cursor() as cur:
+                    await _mark_dispatched(cur, outbox_id, str(row[0]), "notify")
                 handled += 1
                 if stop_after is not None and handled >= stop_after:
                     return handled

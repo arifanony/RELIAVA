@@ -20,7 +20,9 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from ai_sre.approvals import init_approvals
 from ai_sre.db import database_url, init_schema
+from ai_sre.dispatch import init_dispatch
 from ai_sre.main import create_app
 from ai_sre.model import (
     ArtifactTooLarge,
@@ -28,7 +30,7 @@ from ai_sre.model import (
     insert_artifact,
     insert_record,
 )
-from ai_sre.relay import OUTBOX_CHANNEL, relay_listen
+from ai_sre.relay import OUTBOX_CHANNEL, relay_listen, relay_sweep
 from ai_sre.states import (
     IllegalTransition,
     UnknownRecord,
@@ -118,6 +120,8 @@ async def fresh_pool() -> AsyncConnectionPool:
     )
     await pool.open()
     await init_schema(pool)
+    await init_approvals(pool)
+    await init_dispatch(pool)
     await init_model(pool)
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
@@ -247,6 +251,115 @@ def test_relay_sweep_covers_missed_notify() -> None:
                 )
             assert sweeps >= 1  # 2 s fallback sweep ran with no notifies
             assert OUTBOX_CHANNEL == "incident_outbox"
+        finally:
+            await pool.close()
+
+    run(scenario())
+
+
+async def _outbox_row(pool: AsyncConnectionPool, incident_id: str) -> tuple[Any, ...]:
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT id, dispatched_at, workflow_id FROM outbox"
+            " WHERE incident_id = %s",
+            (incident_id,),
+        )
+        row = await cur.fetchone()
+        assert row is not None
+        return row
+
+
+def test_relay_notify_marks_row_dispatched() -> None:
+    async def scenario() -> None:
+        pool = await fresh_pool()
+        client = AsyncClient(
+            transport=ASGITransport(app=create_app(pool)), base_url="http://m6"
+        )
+
+        async def start_workflow(outbox_id: int, incident_id: str) -> None:
+            pass
+
+        relay = asyncio.ensure_future(
+            relay_listen(database_url(), start_workflow, stop_after=1)
+        )
+        try:
+            await asyncio.sleep(0.3)
+            posted = await client.post(
+                "/v1/incidents",
+                json={"service": "checkout", "environment": "staging", "alert": {}},
+                headers={"Idempotency-Key": f"spine-{uuid.uuid4().hex}"},
+            )
+            assert posted.status_code == 202
+            assert await asyncio.wait_for(asyncio.shield(relay), timeout=10) == 1
+            _id, dispatched_at, workflow_id = await _outbox_row(
+                pool, posted.json()["id"]
+            )
+            assert dispatched_at is not None
+            assert workflow_id == f"incident-{posted.json()['id']}"
+        finally:
+            if not relay.done():
+                relay.cancel()
+            await client.aclose()
+            await pool.close()
+
+    run(scenario())
+
+
+def test_relay_sweep_starts_and_marks_without_notify() -> None:
+    async def scenario() -> None:
+        pool = await fresh_pool()
+        try:
+            incident_id = await mk_incident(pool)
+            async with pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "INSERT INTO outbox (incident_id, type, payload)"
+                        " VALUES (%s, 'incident.created', '{}')",
+                        (incident_id,),
+                    )
+                await conn.commit()
+            started: list[tuple[int, str]] = []
+
+            async def start_workflow(outbox_id: int, incident_id_: str) -> None:
+                started.append((outbox_id, incident_id_))
+
+            assert await relay_sweep(pool, start_workflow) == 1
+            assert started[0][1] == incident_id
+            _id, dispatched_at, workflow_id = await _outbox_row(pool, incident_id)
+            assert dispatched_at is not None
+            assert workflow_id == f"incident-{incident_id}"
+            assert await relay_sweep(pool, start_workflow) == 0  # nothing left
+        finally:
+            await pool.close()
+
+    run(scenario())
+
+
+def test_relay_sweep_leaves_row_when_start_fails() -> None:
+    async def scenario() -> None:
+        pool = await fresh_pool()
+        try:
+            incident_id = await mk_incident(pool)
+            async with pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "INSERT INTO outbox (incident_id, type, payload)"
+                        " VALUES (%s, 'incident.created', '{}')",
+                        (incident_id,),
+                    )
+                await conn.commit()
+
+            async def failing(outbox_id: int, incident_id_: str) -> None:
+                raise RuntimeError("temporal down")
+
+            assert await relay_sweep(pool, failing) == 0
+            _id, dispatched_at, _wf = await _outbox_row(pool, incident_id)
+            assert dispatched_at is None  # still pending for a later sweep
+
+            async def working(outbox_id: int, incident_id_: str) -> None:
+                pass
+
+            assert await relay_sweep(pool, working) == 1
         finally:
             await pool.close()
 

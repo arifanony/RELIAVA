@@ -86,6 +86,11 @@ async def advance(
             (new_status, record_id, expected_version),
         )
         updated = await cur.fetchone()
-        assert updated is not None
+        if updated is None:  # a concurrent advance won the version race
+            await conn.rollback()
+            raise VersionConflict(
+                f"{table} {record_id}: version {expected_version} was"
+                " advanced concurrently"
+            )
         await conn.commit()
     return int(updated[0])

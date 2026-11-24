@@ -1,0 +1,30 @@
+{
+  "task": "M6-SPINE",
+  "gate": "spine",
+  "kind": "command",
+  "attempt": "a1a689e5-84c7-4d31-838b-7504692d2da7",
+  "command": "uv run pytest tests/test_spine.py",
+  "started_at": "2026-11-24T05:55:38.425Z",
+  "observed_at": "2026-11-24T06:05:42.349Z",
+  "exit_code": null,
+  "signal": "SIGKILL",
+  "stdout": "============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0\ncachedir: /tmp/ai-sre-pytest-cache\nrootdir: /home/hatch/workspace/reliava-build\nconfigfile: pyproject.toml\nplugins: anyio-4.16.0\ncollected 13 items\n\ntests/test_spine.py ...",
+  "stderr": "",
+  "failure": "timeout",
+  "receipt": null,
+  "revision": {
+    "commit": "c0d15b64d69343ff5bd3bcb51f6d5eb8e64e75e3",
+    "dirty": true
+  },
+  "source_hash": "d621b90d8e964dd2e692dbaa4cd9de0c5b4e45ed3201dc07d3e6a4a290052c7a",
+  "before_hash": "d621b90d8e964dd2e692dbaa4cd9de0c5b4e45ed3201dc07d3e6a4a290052c7a",
+  "config_hash": "35c3448ac405a34633303ec168ea111c6f76e6579f75d90f5286abe6c39bc12a",
+  "environment": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "40c8f6d1d0d573ab7f5ec67fb8a5ddf3b175fb99277f6c80e515f866cf3698f8"
+}

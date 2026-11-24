@@ -218,15 +218,15 @@ def run() -> None:
 
     import uvicorn
 
-    from ai_sre.relay import relay_forever
-
     async def lifespan_app() -> None:
+        from ai_sre.worker import run_embedded_relay
+
         pool = get_pool()
         await pool.open()
         await init_schema(pool)
         await init_approvals(pool)
         await init_dispatch(pool)
-        relay = asyncio.ensure_future(relay_forever(pool))
+        relay = asyncio.ensure_future(run_embedded_relay())
         config = uvicorn.Config(create_app(pool), host="0.0.0.0", port=8000)
         server = uvicorn.Server(config)
         await server.serve()
