@@ -1,10 +1,16 @@
-"""Agent-worker entry points: Temporal workers and the embedded relay.
+"""Trust-zone entry points (FR-16): one process per zone, plus the relay.
 
-Run a local Temporal dev server with `temporal server start-dev`
-(download the temporal CLI separately), then::
+Each zone's process registers ONLY its own activities on its own task
+queue, so credentials stay where they belong:
 
-    python -m ai_sre.worker worker   # three task-queue workers
-    python -m ai_sre.worker relay    # LISTEN/NOTIFY relay -> start workflows
+    python -m ai_sre.worker investigation  # collect + diagnose (read-only)
+    python -m ai_sre.worker sandbox        # patch testing (no credentials)
+    python -m ai_sre.worker trusted        # dispatch + verify (sole holder
+                                           # of STAGING_WRITE_CREDENTIALS)
+    python -m ai_sre.worker relay          # LISTEN/NOTIFY relay -> workflows
+    python -m ai_sre.worker worker         # all three zones (local dev only)
+
+Run a local Temporal dev server first (`temporal server start-dev`).
 """
 
 from __future__ import annotations
@@ -12,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from typing import Any
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -33,9 +40,35 @@ from ai_sre.workflows import (
     IncidentWorkflow,
 )
 
+ROLE_ACTIVITIES: dict[str, tuple[Any, ...]] = {
+    "investigation": (collect_evidence, diagnose),
+    "sandbox": (test_patch,),
+    "trusted": (dispatch_action_activity, verify),
+}
+
+ROLE_QUEUES: dict[str, str] = {
+    "investigation": TASK_QUEUE_INVESTIGATION,
+    "sandbox": TASK_QUEUE_SANDBOX,
+    "trusted": TASK_QUEUE_TRUSTED,
+}
+
 
 def temporal_address() -> str:
     return os.environ.get("TEMPORAL_ADDRESS", "localhost:7233")
+
+
+async def run_role(role: str) -> None:
+    """Run one trust zone's worker (FR-16 entry points)."""
+    if role not in ROLE_ACTIVITIES:
+        raise ValueError(f"unknown role: {role}")
+    client = await Client.connect(temporal_address())
+    worker = Worker(
+        client,
+        task_queue=ROLE_QUEUES[role],
+        workflows=[IncidentWorkflow] if role == "investigation" else [],
+        activities=list(ROLE_ACTIVITIES[role]),
+    )
+    await worker.run()
 
 
 async def run_workers() -> None:
@@ -99,6 +132,8 @@ def main(argv: list[str]) -> int:
         asyncio.run(run_workers())
     elif mode == "relay":
         asyncio.run(run_relay())
+    elif mode in ROLE_ACTIVITIES:
+        asyncio.run(run_role(mode))
     else:
         print(f"unknown mode: {mode}", file=sys.stderr)
         return 2

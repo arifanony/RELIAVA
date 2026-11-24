@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ai_sre.patches import PatchCandidate
 
 from psycopg_pool import AsyncConnectionPool
 
@@ -111,3 +115,62 @@ async def insert_record(
             assert new_id is not None
         await conn.commit()
     return int(new_id[0])
+async def get_action(
+    pool: AsyncConnectionPool, action_id: int
+) -> dict[str, Any] | None:
+    """The canonical action row (id, incident, digest, env, status, version)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT id, incident_id, patch_digest, target_env, status, version"
+            " FROM actions WHERE id = %s",
+            (action_id,),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "id": int(row[0]),
+        "incident_id": row[1],
+        "patch_digest": str(row[2]),
+        "target_env": str(row[3]),
+        "status": str(row[4]),
+        "version": int(row[5]),
+    }
+
+
+async def load_patch_by_digest(
+    pool: AsyncConnectionPool, incident_id: str, digest: str
+) -> PatchCandidate | None:
+    """Reload a stored patch candidate by its PatchCandidate digest (FR-16).
+
+    The artifact store is content-addressed by SHA-256 of the stored bytes;
+    the candidate digest (SHA-256 of diff + base revision) travels in the
+    envelope and is recomputed on load — a mismatch means the stored bytes
+    are not the approved candidate and None is returned.
+    """
+    from ai_sre.patches import PatchCandidate
+
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT content FROM artifacts WHERE incident_id = %s AND kind = 'patch'"
+            " ORDER BY id",
+            (incident_id,),
+        )
+        rows = await cur.fetchall()
+    for (content,) in rows:
+        try:
+            payload = json.loads(bytes(content).decode())
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if payload.get("digest") != digest:
+            continue
+        candidate = PatchCandidate(
+            path=str(payload["path"]),
+            old=str(payload["old"]),
+            new=str(payload["new"]),
+            base_revision=str(payload["base_revision"]),
+        )
+        if candidate.digest != digest:
+            return None
+        return candidate
+    return None
