@@ -115,6 +115,7 @@ async def fresh_pool() -> AsyncConnectionPool:
             await cur.execute(
                 "TRUNCATE dispatch_events, dispatches, approvals,"
                 " incident_events, outbox, incidents,"
+                " actions, hypotheses, diagnoses, artifacts, verifications,"
                 " runbooks, runbook_index_revisions"
             )
         await conn.commit()

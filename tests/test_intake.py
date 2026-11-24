@@ -41,7 +41,10 @@ async def fresh_app() -> tuple[AsyncClient, AsyncConnectionPool]:
     await init_schema(pool)
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("TRUNCATE incident_events, outbox, incidents")
+            await cur.execute(
+                "TRUNCATE incident_events, outbox, incidents,"
+                " actions, hypotheses, diagnoses, artifacts, verifications"
+            )
         await conn.commit()
     app = create_app(pool)
     client = AsyncClient(transport=ASGITransport(app=app), base_url="http://m0")
