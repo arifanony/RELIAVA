@@ -43,7 +43,12 @@ jobs:
         run: uv run mypy src/ai_sre
 
       - name: Full test suite
-        run: uv run pytest tests/ -q
+        run: |
+          set +e
+          uv run pytest tests/ -q 2>&1 | tee /tmp/pytest.log
+          code=${PIPESTATUS[0]}
+          grep -E '^(FAILED|ERROR)' /tmp/pytest.log | while IFS= read -r line; do echo "::error::$line"; done
+          exit $code
 
   compose:
     runs-on: ubuntu-latest
