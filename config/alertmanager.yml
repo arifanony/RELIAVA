@@ -1,0 +1,8 @@
+# FR-19: fired alerts become incidents via the intake adapter.
+route:
+  receiver: ai-sre-intake
+receivers:
+  - name: ai-sre-intake
+    webhook_configs:
+      - url: http://api:8000/v1/alertmanager
+        send_resolved: true

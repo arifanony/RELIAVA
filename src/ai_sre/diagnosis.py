@@ -285,6 +285,7 @@ async def run_diagnosis(
         result.reason = "no valid hypotheses after 3 attempts"
         return result
 
+    notes = ""
     for revision in range(MAX_REVISIONS + 1):
         if not ledger.check(critic.model, estimate_tokens(packed), 1000):
             result.reason = "budget exhausted before critic call"
@@ -300,7 +301,9 @@ async def run_diagnosis(
             return result
         ledger.spend(critic.model, int(verdict["input_tokens"]), int(verdict["output_tokens"]))
         try:
-            accepted = bool(json.loads(str(verdict["text"]))["accept"])
+            verdict_payload = json.loads(str(verdict["text"]))
+            accepted = bool(verdict_payload["accept"])
+            notes = str(verdict_payload.get("notes", ""))
         except (ValueError, KeyError, TypeError):
             result.reason = "critic reply was not valid JSON"
             return result
@@ -311,6 +314,36 @@ async def run_diagnosis(
             result.evidence_calls = evidence_calls
             return result
         result.revisions = min(revision + 1, MAX_REVISIONS)
+        if revision >= MAX_REVISIONS:
+            break
+        # FR-17: feed the critic's notes into a REVISED diagnosis instead
+        # of re-asking the critic about the same one.
+        if not ledger.check(diagnosis.model, estimate_tokens(packed), 2000):
+            result.reason = "budget exhausted before revision call"
+            return result
+        try:
+            reply = await diagnosis.generate(
+                "Revise your diagnosis. Reply ONLY as JSON "
+                '{"hypotheses": [{"text": ..., "evidence_ids": [...]}]}.\n'
+                f"Critic notes: {notes}\n"
+                "Previous hypotheses: "
+                + json.dumps([{"text": h.text, "evidence_ids": h.evidence_ids} for h in hypotheses])
+                + "\nEvidence:\n" + packed
+            )
+        except Exception as exc:  # noqa: BLE001
+            result.reason = f"revision call failed: {exc}"
+            return result
+        ledger.spend(diagnosis.model, int(reply["input_tokens"]), int(reply["output_tokens"]))
+        try:
+            revised = parse_hypotheses(str(reply["text"]))
+        except (ValueError, KeyError, TypeError):
+            result.reason = "revision reply was not valid hypotheses JSON"
+            return result
+        if unknown := validate_citations(revised, known_ids):
+            result.reason = f"unknown evidence citations: {unknown}"
+            return result
+        if revised:
+            hypotheses = revised
     result.reason = "critic rejected after 2 revisions; escalating"
     result.evidence_calls = evidence_calls
     return result

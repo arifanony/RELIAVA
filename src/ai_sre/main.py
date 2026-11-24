@@ -256,6 +256,59 @@ def create_app(pool: AsyncConnectionPool) -> FastAPI:
             "approval_id": dispatch.approval_id,
         }
 
+    @app.post("/v1/alertmanager", status_code=202)
+    async def alertmanager_webhook(body: dict[str, Any]) -> dict[str, str]:
+        """FR-19 wiring: Alertmanager's webhook payload is not the intake
+        shape, so translate it here — one incident per notification group,
+        idempotent on the group key, alert payload preserved as evidence."""
+        import hashlib
+
+        alerts = body.get("alerts") or [{}]
+        labels = body.get("commonLabels") or alerts[0].get("labels", {})
+        service = str(labels.get("service", "unknown"))
+        environment = str(labels.get("environment", "staging"))
+        fingerprints = sorted(
+            str(a.get("fingerprint", "")) for a in alerts if isinstance(a, dict)
+        )
+        group = str(body.get("groupKey", ":".join(fingerprints)))
+        idempotency_key = "am-" + hashlib.sha256(group.encode()).hexdigest()[:32]
+        incident_id = uuid.uuid4()
+        async with pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO incidents (id, idempotency_key, service, environment, payload)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (idempotency_key) DO NOTHING
+                    RETURNING id
+                    """,
+                    (incident_id, idempotency_key, service, environment, Json(body)),
+                )
+                row = await cur.fetchone()
+                if row is None:
+                    await cur.execute(
+                        "SELECT id, status FROM incidents WHERE idempotency_key = %s",
+                        (idempotency_key,),
+                    )
+                    found = await cur.fetchone()
+                    assert found is not None
+                    await conn.commit()
+                    return {"id": str(found[0]), "status": str(found[1])}
+                await cur.execute(
+                    "INSERT INTO outbox (incident_id, type, payload)"
+                    " VALUES (%s, 'incident.created', %s)",
+                    (incident_id, Json(body)),
+                )
+                await cur.execute(
+                    "INSERT INTO incident_events (incident_id, type, source, data)"
+                    " VALUES (%s, 'ai-sre.incident.created', 'alertmanager', %s)",
+                    (incident_id, Json({"service": service,
+                                         "environment": environment,
+                                         "group": group})),
+                )
+            await conn.commit()
+        return {"id": str(incident_id), "status": "received"}
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}

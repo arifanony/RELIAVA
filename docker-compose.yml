@@ -1,5 +1,8 @@
-# One-host AI SRE platform (SPEC constraint). Demo + monitoring stay disposable
-# under demo/docker-compose.yml; the unified store and API live here.
+# FR-19: the root one-host stack — four platform processes (api with its
+# embedded relay, agent-worker, sandbox-runner, trusted-worker) plus
+# PostgreSQL 16, Temporal, Prometheus, Grafana, Alertmanager and the demo
+# target. Alertmanager webhooks land on POST /v1/alertmanager (intake).
+# Demo-only experiments stay under demo/docker-compose.yml.
 services:
   postgres:
     image: postgres:16-alpine
@@ -11,15 +14,114 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: postgres
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "7233:7233"
+    depends_on:
+      - postgres
+
   api:
     build: .
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      TEMPORAL_ADDRESS: temporal:7233
+      APPROVERS: ${APPROVERS:-}
+      APPROVER_ROLES: ${APPROVER_ROLES:-}
     ports:
       - "8000:8000"
     depends_on:
       - postgres
+      - temporal
+
+  agent-worker:
+    build: .
+    command: ["python", "-m", "ai_sre.worker", "investigation"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre
+      TEMPORAL_ADDRESS: temporal:7233
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DIAGNOSIS_MODEL: ${DIAGNOSIS_MODEL:-gemini:gemini-2.5-flash}
+      CRITIC_MODEL: ${CRITIC_MODEL:-ollama:llama3.2:1b}
+      TRIAGE_MODEL: ${TRIAGE_MODEL:-}
+    depends_on:
+      - postgres
+      - temporal
+
+  sandbox-runner:
+    build: .
+    command: ["python", "-m", "ai_sre.worker", "sandbox"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre
+      TEMPORAL_ADDRESS: temporal:7233
+      STAGING_TREE: /staging
+      PATCH_ROOTS: /staging
+      PATCH_TEST_CMD: ${PATCH_TEST_CMD:-python -m pytest -q}
+    volumes:
+      - staging:/staging:ro
+    depends_on:
+      - postgres
+      - temporal
+
+  trusted-worker:
+    build: .
+    command: ["python", "-m", "ai_sre.worker", "trusted"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre
+      TEMPORAL_ADDRESS: temporal:7233
+      STAGING_TREE: /staging
+      STAGING_WRITE_CREDENTIALS: ${STAGING_WRITE_CREDENTIALS:-}
+      PROM_URL: http://prometheus:9090
+      REPLAY_URL: http://demo:8000
+    volumes:
+      - staging:/staging
+    depends_on:
+      - postgres
+      - temporal
+
+  demo:
+    build: ./demo
+    ports:
+      - "8001:8000"
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/alerts.yml:/etc/prometheus/alerts.yml:ro
+    depends_on:
+      - demo
+      - api
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
 
 volumes:
   pgdata:
+  staging:

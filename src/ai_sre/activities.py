@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -96,15 +97,9 @@ async def collect_evidence_for(pool: AsyncConnectionPool, incident_id: str) -> s
         if row is None:
             raise ValueError(f"unknown incident {incident_id}")
         service, environment, payload = row
-    lines = (
-        payload.get("logs", [json.dumps(payload)])
-        if isinstance(payload, dict)
-        else [str(payload)]
-    )
-    items = collect(
-        [(f"{service}-logs", "5m", line) for line in lines]
-        + [(f"{service}-meta", "5m", f"service={service} env={environment}")]
-    )
+    from ai_sre.evidence_adapters import items_from_payload
+
+    items = collect(items_from_payload(payload, service, environment))
     await _advance(pool, "incidents", incident_id, "investigating")
     return json.dumps(
         {
@@ -176,17 +171,50 @@ async def diagnose_and_persist(
     items: list[EvidenceItem],
     diagnosis_transport: Transport,
     critic_transport: Transport,
+    diagnosis_provider: str = "unknown",
+    critic_provider: str = "unknown",
+    triage_transport: Transport | None = None,
+    triage_provider: str = "unknown",
 ) -> str:
     """Run the diagnosis cycle and persist its outcome (FR-15 + FR-16).
 
-    Hypotheses and the diagnosis verdict become canonical records; an
-    accepted diagnosis also produces one patch candidate whose content is
-    stored as a digest-addressed artifact plus an actions row in PROPOSED.
-    Only identifiers travel onward.
+    Every model call goes through the FR-17 gateway: worst-case budget is
+    reserved before each call, at most 2 calls run concurrently for the
+    incident, calls are refused after the investigation deadline
+    (incident creation + the 8-minute workflow deadline), and every
+    attempt is recorded in model_attempts. Hypotheses and the diagnosis
+    verdict become canonical records; an accepted diagnosis also produces
+    one patch candidate whose content is stored as a digest-addressed
+    artifact plus an actions row in PROPOSED. Only identifiers travel
+    onward.
     """
-    ledger = BudgetLedger()
+    from ai_sre.gateway import Gateway, ReservingLedger, init_gateway, triage_brief
+
+    await init_gateway(pool)
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT created_at FROM incidents WHERE id = %s", (incident_id,)
+        )
+        created = await cur.fetchone()
+    started = created[0] if created else datetime.now(UTC)
+    ledger = ReservingLedger()
+    gateway = Gateway(
+        incident_id=incident_id,
+        ledger=ledger,
+        deadline=started + timedelta(minutes=8),
+        pool=pool,
+    )
+    if triage_transport is not None:
+        packed = "\n".join(f"[{i.id}] {i.text}" for i in items)
+        brief = await triage_brief(
+            gateway.wrap(triage_transport, "triage", triage_provider), packed
+        )
+        items = [*items, EvidenceItem(id="T1", source="triage", window="-", text=brief)]
     result = await run_diagnosis(
-        items, diagnosis_transport, critic_transport, ledger
+        items,
+        gateway.wrap(diagnosis_transport, "diagnosis", diagnosis_provider),
+        gateway.wrap(critic_transport, "critic", critic_provider),
+        ledger,
     )
     for hypothesis in result.hypotheses:
         await insert_record(
@@ -219,7 +247,10 @@ async def diagnose_and_persist(
         return json.dumps(out)
     try:
         candidate = await _propose_patch(
-            items, result.hypotheses, diagnosis_transport, ledger
+            items,
+            result.hypotheses,
+            gateway.wrap(diagnosis_transport, "patch", diagnosis_provider),
+            ledger,
         )
     except Exception as exc:  # noqa: BLE001 - no patch, no action: inconclusive
         out["status"] = "INCONCLUSIVE"
@@ -285,13 +316,31 @@ async def diagnose(evidence_json: str) -> str:
         EvidenceItem(id=e["id"], source=e["source"], window=e["window"], text=e["text"])
         for e in entries
     ]
+    from ai_sre.gateway import provider_of
+
     diagnosis_transport = transport_from_env("DIAGNOSIS", "gemini:gemini-2.5-flash")
     critic_transport = transport_from_env("CRITIC", "ollama:llama3.2:1b")
+    triage_spec = os.environ.get("TRIAGE_MODEL")
+    triage_transport = (
+        transport_from_env("TRIAGE", triage_spec) if triage_spec else None
+    )
     pool = _pool()
     await pool.open()
     try:
         return await diagnose_and_persist(
-            pool, incident_id, items, diagnosis_transport, critic_transport
+            pool,
+            incident_id,
+            items,
+            diagnosis_transport,
+            critic_transport,
+            diagnosis_provider=provider_of(
+                os.environ.get("DIAGNOSIS_MODEL", "gemini:gemini-2.5-flash")
+            ),
+            critic_provider=provider_of(
+                os.environ.get("CRITIC_MODEL", "ollama:llama3.2:1b")
+            ),
+            triage_transport=triage_transport,
+            triage_provider=provider_of(triage_spec) if triage_spec else "unknown",
         )
     finally:
         await pool.close()
