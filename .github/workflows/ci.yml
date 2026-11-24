@@ -1,0 +1,57 @@
+name: CI
+
+# Full verification on a normal runner: the complete test suite —
+# including the Docker-gated sandbox tests, the backup drill and the
+# Temporal workflow test — plus lint, types and the Compose stack.
+# (These are the runs that could not complete in restricted sandboxes;
+# see NEXT_STEPS.md and .genesis KNOWLEDGE-91c7bc14.)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/aisre
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start PostgreSQL 16 (named for the backup drill)
+        run: |
+          docker run -d --name ai-sre-pg16 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=aisre \
+            -p 5432:5432 postgres:16-alpine
+          for i in $(seq 1 30); do
+            docker exec ai-sre-pg16 pg_isready -U postgres -d aisre && break
+            sleep 1
+          done
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Type check
+        run: uv run mypy src/ai_sre
+
+      - name: Full test suite
+        run: uv run pytest tests/ -q
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the FR-19 stack
+        run: docker compose config -q
+
+      - name: Build the platform and demo images
+        run: docker compose build
