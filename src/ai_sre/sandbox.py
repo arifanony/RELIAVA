@@ -8,6 +8,7 @@ realized as: numeric non-root user + no-new-privileges + read-only rootfs.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 
@@ -38,6 +39,25 @@ class SandboxResult:
     stderr: str
 
 
+def _grant_container_read(tree: str) -> None:
+    """Grant other-read on a sandbox source tree.
+
+    The tree is bind-mounted read-only and read inside the container as uid
+    65534. Linux bind mounts keep host ownership, so temp dirs (mode 0700)
+    are unreadable there; Docker Desktop is lenient, which is why this only
+    fails on Linux CI runners.
+    """
+    for root, dirs, files in os.walk(tree):
+        os.chmod(root, os.stat(root).st_mode | 0o055)
+        for name in dirs + files:
+            path = os.path.join(root, name)
+            if os.path.islink(path):
+                continue
+            mode = os.stat(path).st_mode
+            extra = 0o044 | (0o011 if mode & 0o100 else 0)
+            os.chmod(path, mode | extra)
+
+
 def run_in_sandbox(
     source_dir: str,
     command: str,
@@ -45,6 +65,7 @@ def run_in_sandbox(
     image: str = SANDBOX_IMAGE,
 ) -> SandboxResult:
     """Copy source_dir (mounted read-only) to tmpfs and run command there."""
+    _grant_container_read(source_dir)
     shell = f"cp -r /src/. /tmp/work/ && cd /tmp/work && {command}"
     completed = subprocess.run(
         [
