@@ -27,8 +27,7 @@ from ai_sre.dispatch import (
     dispatch_action,
     init_dispatch,
 )
-
-OUTBOX_CHANNEL = "incident_outbox"
+from ai_sre.relay import OUTBOX_CHANNEL
 
 
 async def _noop_executor(action: dict[str, Any]) -> dict[str, Any]:
@@ -112,7 +111,7 @@ def create_app(pool: AsyncConnectionPool) -> FastAPI:
                     "SELECT pg_notify(%s, %s)", (OUTBOX_CHANNEL, str(outbox_row[0]))
                 )
             await conn.commit()
-        return {"id": str(incident_id), "status": "open"}
+        return {"id": str(incident_id), "status": "received"}
 
     @app.get("/v1/incidents/{incident_id}/timeline")
     async def timeline(

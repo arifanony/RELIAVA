@@ -1,0 +1,30 @@
+{
+  "task": "M0-SKELETON",
+  "gate": "lint",
+  "kind": "command",
+  "attempt": "b0758932-eed7-4604-81b1-0c62fcf27870",
+  "command": "uv run ruff check .",
+  "started_at": "2026-11-23T22:26:11.911Z",
+  "observed_at": "2026-11-23T22:26:15.159Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "All checks passed!\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "ed7c950c330442b198444c0b2be208b2ee208becc60458b7dd65e2d2972e88ef",
+  "before_hash": "ed7c950c330442b198444c0b2be208b2ee208becc60458b7dd65e2d2972e88ef",
+  "config_hash": "a9fd0f1cc90a8ed2cf0c46b2bed202943d0400462e773ec25a8b32cf9402327f",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "543fba68ee8218629725663dd3bfd6921d8a9613d5e43bc7be1acefae23d06f1"
+}

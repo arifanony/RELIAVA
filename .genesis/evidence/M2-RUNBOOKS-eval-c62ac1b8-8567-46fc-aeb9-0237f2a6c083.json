@@ -1,0 +1,30 @@
+{
+  "task": "M2-RUNBOOKS",
+  "gate": "eval",
+  "kind": "command",
+  "attempt": "c62ac1b8-8567-46fc-aeb9-0237f2a6c083",
+  "command": "uv run pytest tests/test_runbook_eval.py",
+  "started_at": "2026-11-23T22:45:41.727Z",
+  "observed_at": "2026-11-23T22:45:44.865Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "============================= test session starts ==============================\nplatform darwin -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0\ncachedir: /tmp/ai-sre-pytest-cache\nrootdir: /Users/arif/Projects/AI SRE\nconfigfile: pyproject.toml\nplugins: anyio-4.16.0\ncollected 3 items\n\ntests/test_runbook_eval.py ...                                           [100%]\n\n============================== 3 passed in 0.82s ===============================\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "687bb6807ff16a971beb6b5e1e0874bfe66d09c58c6253a39383afe9231f6494",
+  "before_hash": "687bb6807ff16a971beb6b5e1e0874bfe66d09c58c6253a39383afe9231f6494",
+  "config_hash": "8d832fa23f2876beafd84cdd862b2aff1260e298245f6c4a18a6db44202bad67",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "9d74b2dfd59c25a21a4f0b765774a6f6db1aa7bdced6ff2708124cba0aa02908"
+}

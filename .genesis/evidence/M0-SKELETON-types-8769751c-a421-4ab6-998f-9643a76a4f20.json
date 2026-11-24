@@ -1,0 +1,30 @@
+{
+  "task": "M0-SKELETON",
+  "gate": "types",
+  "kind": "command",
+  "attempt": "8769751c-a421-4ab6-998f-9643a76a4f20",
+  "command": "uv run mypy src",
+  "started_at": "2026-11-23T22:26:43.301Z",
+  "observed_at": "2026-11-23T22:26:47.357Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "Success: no issues found in 4 source files\n",
+  "stderr": "",
+  "failure": "source-mutated",
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "c7b937c7bd96c6b5304a8f8f23acb6a7283d2bb8293ae4dd5ee8df3ce5b19e3b",
+  "before_hash": "5d8ffb353cbfb6ba85fa3d8ed4db6000f2cc3ab0e42b9fb1b902853cc2471e12",
+  "config_hash": "a9fd0f1cc90a8ed2cf0c46b2bed202943d0400462e773ec25a8b32cf9402327f",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "815f2d92bd38047a7b6c399a4d7b450f69b3abba984e9d3d1c6717bf4bda900e"
+}

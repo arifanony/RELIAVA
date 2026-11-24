@@ -44,7 +44,11 @@ def database_url() -> str:
 
 
 def get_pool() -> AsyncConnectionPool:
-    return AsyncConnectionPool(database_url(), open=False)
+    # connect_timeout bounds loopback stalls: without it a wedged SYN hangs a
+    # pool worker forever, and the retry path swallows teardown cancellation.
+    return AsyncConnectionPool(
+        database_url(), open=False, kwargs={"connect_timeout": 10}
+    )
 
 
 async def init_schema(pool: AsyncConnectionPool) -> None:

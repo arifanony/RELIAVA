@@ -49,7 +49,8 @@ REVISION = "m4-fixture-v1"
 
 async def fresh_pool() -> AsyncConnectionPool:
     pool = AsyncConnectionPool(
-        os.environ.get("DATABASE_URL", database_url()), open=False
+        os.environ.get("DATABASE_URL", database_url()), open=False,
+        kwargs={"connect_timeout": 10}
     )
     await pool.open()
     await init_schema(pool)

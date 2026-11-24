@@ -1,0 +1,30 @@
+{
+  "task": "SETUP-1",
+  "gate": "python-ok",
+  "kind": "command",
+  "attempt": "2fa1efe1-9338-45e6-a254-1b7e8cafae42",
+  "command": "uv run python --version",
+  "started_at": "2026-11-23T22:19:45.933Z",
+  "observed_at": "2026-11-23T22:19:49.269Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "Python 3.12.16\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "before_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "config_hash": "ac9bf5c151890c3b3d3027433660679993d836c71ba2555a9d4ede825049d00b",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "dcb99893eb84eb05cc3a62d5347f9b250690f771ddaf40e451d272e020745793"
+}

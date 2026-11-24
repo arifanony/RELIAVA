@@ -1,17 +1,23 @@
-"""Embedded outbox relay (FR-2): claim rows with SKIP LOCKED, request dispatch.
+"""Embedded outbox relay (FR-2/FR-14): LISTEN fast-path, 2 s SKIP LOCKED sweep.
 
-Polls every 2 s. Inserts carry pg_notify for a future LISTEN fast-path; the
-poll is the durable fallback, not the optimization. Temporal execution comes
-later: dispatch here records workflow incident-<id> as requested.
+The listener wakes on pg_notify with the outbox row id and hands it to the
+callback (production: start Temporal IncidentWorkflow incident-<id>). Every
+wake window also runs a SKIP LOCKED sweep so a missed notify can only delay,
+never lose, a row. Uses a dedicated autocommit connection: pooled connections
+stay inside transactions where LISTEN delivery is unreliable.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from typing import Any
 
+from psycopg import AsyncConnection
 from psycopg.types.json import Json
 from psycopg_pool import AsyncConnectionPool
+
+OUTBOX_CHANNEL = "incident_outbox"
 
 
 async def relay_once(pool: AsyncConnectionPool) -> int | None:
@@ -55,3 +61,52 @@ async def relay_forever(pool: AsyncConnectionPool, poll_interval: float = 2.0) -
         while await relay_once(pool) is not None:
             pass
         await asyncio.sleep(poll_interval)
+
+
+async def relay_listen(
+    conninfo: str,
+    on_outbox: Callable[[int, str], Awaitable[None]],
+    sweep: Callable[[], Awaitable[None]] | None = None,
+    stop_after: int | None = None,
+    on_error: Callable[[int, Exception], Awaitable[None]] | None = None,
+) -> int:
+    """LISTEN for outbox notifies and hand each row to on_outbox(outbox_id,
+    incident_id). Every 2 s window also runs the sweep (SKIP LOCKED fallback).
+    Returns the number of notifies handled. stop_after bounds test runs.
+
+    Uses two connections: the notifies() generator holds the connection lock
+    while suspended, so lookups on the same connection would deadlock.
+    """
+    listen_conn = await AsyncConnection.connect(conninfo, autocommit=True)
+    query_conn = await AsyncConnection.connect(conninfo, autocommit=True)
+    handled = 0
+    try:
+        await listen_conn.execute(f"LISTEN {OUTBOX_CHANNEL}")
+        while True:
+            async for notify in listen_conn.notifies(timeout=2.0):
+                try:
+                    outbox_id = int(notify.payload)
+                except (TypeError, ValueError):
+                    continue
+                async with query_conn.cursor() as cur:
+                    await cur.execute(
+                        "SELECT incident_id FROM outbox WHERE id = %s", (outbox_id,)
+                    )
+                    row = await cur.fetchone()
+                if row is None:
+                    continue
+                try:
+                    await on_outbox(outbox_id, str(row[0]))
+                except Exception as exc:  # noqa: BLE001 - relay must survive a bad row
+                    if on_error is not None:
+                        await on_error(outbox_id, exc)
+                    continue
+                handled += 1
+                if stop_after is not None and handled >= stop_after:
+                    return handled
+            if sweep is not None:
+                await sweep()
+    finally:
+        await listen_conn.close()
+        await query_conn.close()
+    return handled

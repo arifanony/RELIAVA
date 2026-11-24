@@ -1,0 +1,13 @@
+{
+  "task": "M4-DISPATCH",
+  "gate": "independent-review",
+  "kind": "review",
+  "attempt": "73e5906b-95cf-44ec-8c9d-175227b19cfa",
+  "human": "arif",
+  "reason": "checked",
+  "observed_at": "2026-11-23T23:11:56.230Z",
+  "source_hash": "420629d5af81331e60b9e2526856f9aafaf4ed47c5806215da71b01437983f42",
+  "config_hash": "74d200cca39489491577009f7957b61151c3bcd85cd173e853eb72b902be20a6",
+  "reviewed_proofs": "cf1b187d8ba71b6d9082f8980fc6acf73125224ccd6fb203726946560b6e2372",
+  "hash": "3bd04aa5f1450a60c5aafc40c655f6768b6543b1624cb11b22d62aab9800a7ae"
+}

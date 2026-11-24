@@ -1,0 +1,30 @@
+{
+  "task": "DEMO-1",
+  "gate": "faults",
+  "kind": "command",
+  "attempt": "b874c69b-060c-4884-a994-db8d262e5931",
+  "command": "uv run pytest demo/tests/test_faults.py",
+  "started_at": "2026-11-23T22:52:48.842Z",
+  "observed_at": "2026-11-23T22:52:52.452Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "============================= test session starts ==============================\nplatform darwin -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0\ncachedir: /tmp/ai-sre-pytest-cache\nrootdir: /Users/arif/Projects/AI SRE\nconfigfile: pyproject.toml\nplugins: anyio-4.16.0\ncollected 6 items\n\ndemo/tests/test_faults.py ......                                         [100%]\n\n============================== 6 passed in 0.88s ===============================\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "fa7b365a1241957cf7bb5c35363a4e767dd559a5909bd599e572c488b2b02cf5",
+  "before_hash": "fa7b365a1241957cf7bb5c35363a4e767dd559a5909bd599e572c488b2b02cf5",
+  "config_hash": "1cde5609d8cccb41f424e18f0a346ddfbd2cc59582e0abcd22bd1eef7507b872",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "198da3be485a07d492b1af04aaf39f71bd40f88bd2ec63fd6d196cba39480344"
+}

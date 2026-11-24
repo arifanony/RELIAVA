@@ -1,0 +1,30 @@
+{
+  "task": "SETUP-1",
+  "gate": "key-ok",
+  "kind": "command",
+  "attempt": "538ae007-9763-4d31-9b76-c27dee5764a8",
+  "command": "test -n \"$OPENROUTER_API_KEY\"",
+  "started_at": "2026-11-23T22:17:28.384Z",
+  "observed_at": "2026-11-23T22:17:32.080Z",
+  "exit_code": 1,
+  "signal": null,
+  "stdout": "",
+  "stderr": "",
+  "failure": "command-failed",
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "before_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "config_hash": "ac9bf5c151890c3b3d3027433660679993d836c71ba2555a9d4ede825049d00b",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "569ebf48c019bc2654e43e500b3288ff56da0bcd9f81e504b64c0561b9e3349c"
+}

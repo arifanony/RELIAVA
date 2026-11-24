@@ -1,0 +1,30 @@
+{
+  "task": "DEMO-1",
+  "gate": "compose",
+  "kind": "command",
+  "attempt": "4dfde3b4-c8c4-4a2e-9fa0-e0a9b456eb7e",
+  "command": "docker compose -f demo/docker-compose.yml config",
+  "started_at": "2026-11-23T22:52:44.562Z",
+  "observed_at": "2026-11-23T22:52:47.260Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "name: demo\nservices:\n  alertmanager:\n    image: prom/alertmanager:v0.27.0\n    networks:\n      default: null\n    volumes:\n      - type: bind\n        source: /Users/arif/Projects/AI SRE/demo/alertmanager.yml\n        target: /etc/alertmanager/alertmanager.yml\n        read_only: true\n        bind: {}\n    ports:\n      - mode: ingress\n        target: 9093\n        published: \"9093\"\n        protocol: tcp\n  demo:\n    networks:\n      default: null\n    build:\n      context: /Users/arif/Projects/AI SRE/demo\n      dockerfile: Dockerfile\n    ports:\n      - mode: ingress\n        target: 8000\n        published: \"8000\"\n        protocol: tcp\n  prometheus:\n    image: prom/prometheus:v2.55.0\n    networks:\n      default: null\n    volumes:\n      - type: bind\n        source: /Users/arif/Projects/AI SRE/demo/prometheus.yml\n        target: /etc/prometheus/prometheus.yml\n        read_only: true\n        bind: {}\n      - type: bind\n        source: /Users/arif/Projects/AI SRE/demo/alerts.yml\n        target: /etc/prometheus/alerts.yml\n        read_only: true\n        bind: {}\n    ports:\n      - mode: ingress\n        target: 9090\n        published: \"9090\"\n        protocol: tcp\nnetworks:\n  default:\n    name: demo_default\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "fa7b365a1241957cf7bb5c35363a4e767dd559a5909bd599e572c488b2b02cf5",
+  "before_hash": "fa7b365a1241957cf7bb5c35363a4e767dd559a5909bd599e572c488b2b02cf5",
+  "config_hash": "1cde5609d8cccb41f424e18f0a346ddfbd2cc59582e0abcd22bd1eef7507b872",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "571a06cb26bcb6a31dd16541cb75260c5c887002fb795e8d6b2562d698009ae3"
+}

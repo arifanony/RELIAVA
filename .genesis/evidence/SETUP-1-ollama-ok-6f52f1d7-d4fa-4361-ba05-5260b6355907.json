@@ -1,0 +1,30 @@
+{
+  "task": "SETUP-1",
+  "gate": "ollama-ok",
+  "kind": "command",
+  "attempt": "6f52f1d7-d4fa-4361-ba05-5260b6355907",
+  "command": "ollama list",
+  "started_at": "2026-11-23T22:19:50.800Z",
+  "observed_at": "2026-11-23T22:19:53.971Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "NAME                ID              SIZE      MODIFIED       \nqwen2.5-coder:7b    dae161e27b0e    4.7 GB    17 minutes ago    \n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "before_hash": "d6e326828d8393b6d77dc5b5b48700c108eac5ee109aad73928d65510492e9f4",
+  "config_hash": "ac9bf5c151890c3b3d3027433660679993d836c71ba2555a9d4ede825049d00b",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "b9cf1d41acfda4c562d6c4ee36a3bac96cb50daac4f12535705c7a176874c2c6"
+}

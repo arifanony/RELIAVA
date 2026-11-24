@@ -1,0 +1,30 @@
+{
+  "task": "M5-OPERATE",
+  "gate": "compose",
+  "kind": "command",
+  "attempt": "8533088b-9fac-401f-872f-65cd53af6056",
+  "command": "docker compose config",
+  "started_at": "2026-11-23T23:18:58.358Z",
+  "observed_at": "2026-11-23T23:19:02.481Z",
+  "exit_code": 0,
+  "signal": null,
+  "stdout": "name: aisre\nservices:\n  api:\n    environment:\n      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/aisre\n      OPENROUTER_API_KEY: [REDACTED]\n    networks:\n      default: null\n    build:\n      context: /Users/arif/Projects/AI SRE\n      dockerfile: Dockerfile\n    depends_on:\n      postgres:\n        condition: service_started\n        required: true\n    ports:\n      - mode: ingress\n        target: 8000\n        published: \"8000\"\n        protocol: tcp\n  postgres:\n    environment:\n      POSTGRES_DB: aisre\n      POSTGRES_PASSWORD: postgres\n      POSTGRES_USER: postgres\n    image: postgres:16-alpine\n    networks:\n      default: null\n    volumes:\n      - type: volume\n        source: pgdata\n        target: /var/lib/postgresql/data\n        volume: {}\n    ports:\n      - mode: ingress\n        target: 5432\n        published: \"5432\"\n        protocol: tcp\nnetworks:\n  default:\n    name: aisre_default\nvolumes:\n  pgdata:\n    name: aisre_pgdata\n",
+  "stderr": "",
+  "failure": null,
+  "receipt": null,
+  "revision": {
+    "commit": null,
+    "dirty": null
+  },
+  "source_hash": "6c6a03823eadc96336e780759f453c6f62c1d83dac534cafe12b50b8522dca9b",
+  "before_hash": "6c6a03823eadc96336e780759f453c6f62c1d83dac534cafe12b50b8522dca9b",
+  "config_hash": "f1b91c21e9f69a6fa097179d39018ac9c9d5b14e853d2640e2273e8102757be3",
+  "environment": {
+    "node": "v22.23.3",
+    "platform": "darwin",
+    "arch": "x64",
+    "verifier": "cbdddbf25e5ed5f3406b93881ae54f64d11a8c54f0bfe177d19d9d9946a6a971",
+    "variables": {}
+  },
+  "hash": "ba417643500b53a2a1bb902a3790ea7ed0143331ce716460c15889703c0c05f6"
+}

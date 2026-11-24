@@ -1,0 +1,13 @@
+{
+  "task": "M3-SANDBOX",
+  "gate": "independent-review",
+  "kind": "review",
+  "attempt": "b225f733-3023-4c74-9a54-f16ab759f449",
+  "human": "arif",
+  "reason": "sandbox is working",
+  "observed_at": "2026-11-23T23:00:53.314Z",
+  "source_hash": "5b6c0e0aafd0132df6ff37f294b9bdf09701156b7c4b1a8e67d78fb173295f48",
+  "config_hash": "1a8cf004c6def91c428a1a0223f533cb44e2316684eaf738f55c827af491e047",
+  "reviewed_proofs": "da1175d9188b738c8217e0ca327227882dbea2f8cb543c367725b5f5d8ccb920",
+  "hash": "5439d0581bba77a2f2a94c46e4e17f84d03f6569209071a6958a6de47d90c257"
+}
